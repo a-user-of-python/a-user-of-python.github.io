@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Advanced 2D Physics Simulator</title>
+  <style>
+    body { margin: 0; background: #232323; color: #eee; font-family: sans-serif; }
+    #controls {
+      padding: 10px 5px 10px 15px;
+      background: #343642;
+      position: fixed;
+      top: 0; left: 0; width: 100%;
+      z-index: 10;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 15px;
+    }
+    #controls button, #controls select, #controls input[type="range"] {
+      margin-right: 4px;
+    }
+    #canvasWrapper {
+      position:relative;
+      margin-top:60px;
+    }
+    #simCanvas {
+      display: block; margin: auto;
+      background: #191c20; border: 2px solid #555c;
+      box-shadow: 3px 3px 8px #0008;
+    }
+    #saveLoadArea {
+      position: fixed; right: 12px; top: 60px;
+      background: #222b;
+      color: #fff;
+      border-radius: 8px; padding: 8px;
+      box-shadow: 2px 2px 8px #0005;
+      font-family: monospace;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <button id="addCircle" title="Add a circle at random position with random size">Add Circle</button>
+    <button id="addRect" title="Add a rectangle at random position with random size">Add Rectangle</button>
+    <button id="addSpring">Add Spring</button>
+    <button id="removeSpring" title="Click on a spring line to remove.">Remove Spring</button>
+    <button id="pauseBtn">Pause</button>
+    <button id="resetBtn">Reset</button>
+    <label>Gravity:<input type="range" id="gravityMag" min="0" max="3" step="0.01" value="0.65" style="width:80px"></label>
+    <label>Angle:<input type="range" id="gravityAng" min="0" max="360" step="1" value="90" style="width:80px"></label>
+    <span id="gravityLab"></span>
+    <label>Elasticity:<input type="range" id="elasticRange" min="0.3" max="1" step="0.01" value="0.8" style="width:70px"></label>
+    <label>Friction:<input type="range" id="fricRange" min="0.88" max="0.99" step="0.01" value="0.98" style="width:70px"></label>
+    <select id="shapeSelect"><option>Circle</option><option>Rectangle</option></select>
+    <button id="debugBtn">Debug: Off</button>
+    <span id="fpsLabel" style="font-size: 13px; margin-left:20px;"></span>
+    <span id="mouseLab"></span>
+  </div>
+  <div id="canvasWrapper">
+    <canvas id="simCanvas" width="1100" height="700"></canvas>
+    <div id="saveLoadArea">
+      <b>Scene JSON</b><br>
+      <textarea id="sceneJSON" rows="5" cols="38" placeholder="Scene data..."></textarea><br>
+      <button id="saveSceneBtn">Save</button>
+      <button id="loadSceneBtn">Load</button>
+    </div>
+  </div>
+<script>
+// =============== Utility Functions ===============
+function randColor() {
+  const c = () => Math.floor(Math.random()*180+50);
+  return `rgb(${c()},${c()},${c()})`;
+}
+function clamp(v, min, max) { return Math.max(min, Math.min(v, max)); }
+function lerp(a,b,t) { return a+(b-a)*t; }
+function vlen(x, y) { return Math.sqrt(x*x + y*y); }
+function dist(ax, ay, bx, by) { return Math.sqrt((ax-bx)**2 + (ay-by)**2); }
+function rotate(x, y, a) {
+  return {x:x*Math.cos(a)-y*Math.sin(a), y:x*Math.sin(a)+y*Math.cos(a)};
+}
+function angleBetween(ax, ay, bx, by) {
+  return Math.atan2(by-ay, bx-ax);
+}
+// =============== Physics Classes ===============
+// --- Body base class ---
+class Body {
+  constructor(type, x, y, w, h, angle=0) {
+    this.type=type; // 'circle'|'rect'
+    this.x=x; this.y=y;
+    this.vx=0; this.vy=0;
+    this.angle=angle; // radians
+    this.angVel=0;
+    this.mass = (type==='circle') ? Math.PI*(w/2)**2*0.01 : w*h*0.01;
+    this.invMass = 1/this.mass;
+    this.radius = (type==='circle')?w/2:0;
+    this.w = w;
+    this.h = h;
+    this.color = randColor();
+    this.elastic = 0.8;
+    this.fric = 0.98;
+    this.trail = [];
+    this.selected = false;
+    this.dragged = false;
+    this.fx = 0; this.fy = 0; // force accumulators
+    this.lockRotation = (type==='rect'?false:true);
+  }
+  getVertices() {
+    if (this.type==='rect') {
+      let hw = this.w/2, hh=this.h/2;
+      let verts = [
+        {x: hw, y: hh},
+        {x:-hw, y: hh},
+        {x:-hw, y:-hh},
+        {x: hw, y:-hh}
+      ];
+      let v2=[];
+      for(let v of verts) {
+        let r = rotate(v.x, v.y, this.angle);
+        v2.push({x:this.x+r.x, y:this.y+r.y});
+      }
+      return v2;
+    }
+    return [];
+  }
+}
+
+// --- Spring ---
+class Spring {
+  constructor(a,b,len,springK=0.12){
+    this.a=a;this.b=b;
+    this.len = len;
+    this.k = springK;
+  }
+}
+
+// =============== Simulator State ===============
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const FPS = 60;
+let paused = false;
+let bodies = [];
+let springs = [];
+let debugDraw=false;
+let lastTimestamp = null;
+let boundary = {w:canvas.width, h:canvas.height};
+
+let gravityMag = parseFloat(document.getElementById('gravityMag').value);
+let gravityAng = parseInt(document.getElementById('gravityAng').value) * Math.PI/180;
+let gravity = {x: Math.cos(gravityAng)*gravityMag, y: Math.sin(gravityAng)*gravityMag};
+let elasticity = parseFloat(document.getElementById('elasticRange').value);
+let friction = parseFloat(document.getElementById('fricRange').value);
+// =============== Scene IO ===============
+function saveScene() {
+  const scene = {
+    bodies: bodies.map(b=>{
+      return {
+        type: b.type, x:b.x, y:b.y, w:b.w, h:b.h, angle:b.angle,
+        vx:b.vx, vy:b.vy, angVel:b.angVel, color:b.color, elastic:b.elastic, fric:b.fric
+      };
+    }),
+    springs: springs.map(s=>{
+      return {ai: bodies.indexOf(s.a), bi: bodies.indexOf(s.b), len: s.len, k:s.k};
+    }),
+    gravityMag, gravityAng, elasticity, friction
+  };
+  document.getElementById('sceneJSON').value = JSON.stringify(scene,null,2);
+}
+function loadScene() {
+  let json=document.getElementById('sceneJSON').value;
+  try{
+    let s = JSON.parse(json);
+    bodies=[];
+    springs=[];
+    for(let b of s.bodies){
+      let body = new Body(b.type,b.x,b.y,b.w,b.h,b.angle);
+      Object.assign(body, b);
+      bodies.push(body);
+    }
+    for(let sp of s.springs){
+      let a = bodies[sp.ai], b = bodies[sp.bi];
+      springs.push(new Spring(a,b,sp.len,sp.k));
+    }
+    gravityMag = s.gravityMag??gravityMag;
+    gravityAng = s.gravityAng??gravityAng;
+    elasticity = s.elasticity??elasticity;
+    friction = s.friction??friction;
+    document.getElementById('gravityMag').value = gravityMag;
+    document.getElementById('gravityAng').value = Math.round(gravityAng*180/Math.PI);
+    document.getElementById('elasticRange').value = elasticity;
+    document.getElementById('fricRange').value = friction;
+    updateGravity();
+  }catch(e){alert('Invalid scene JSON');}
+}
+// =============== Controls ===============
+function updateGravity(){
+  gravityAng = parseInt(document.getElementById('gravityAng').value)*Math.PI/180;
+  gravityMag = parseFloat(document.getElementById('gravityMag').value);
+  gravity = {x: Math.cos(gravityAng)*gravityMag, y: Math.sin(gravityAng)*gravityMag};
+  document.getElementById('gravityLab').innerText = `(${gravity.x.toFixed(2)}, ${gravity.y.toFixed(2)})`;
+}
+document.getElementById('gravityMag').oninput = updateGravity;
+document.getElementById('gravityAng').oninput = updateGravity;
+document.getElementById('elasticRange').oninput = ()=>{
+  elasticity=parseFloat(document.getElementById('elasticRange').value);
+  bodies.forEach(b=>b.elastic=elasticity);
+};
+document.getElementById('fricRange').oninput = ()=>{
+  friction = parseFloat(document.getElementById('fricRange').value);
+  bodies.forEach(b=>b.fric=friction);
+};
+document.getElementById('pauseBtn').onclick = ()=>{
+  paused=!paused;
+  document.getElementById('pauseBtn').textContent = paused?"Resume":"Pause";
+};
+document.getElementById('resetBtn').onclick = ()=>{
+  bodies=[]; springs=[];
+};
+document.getElementById('addCircle').onclick = ()=>{
+  let w = Math.random()*38+16;
+  let x = Math.random()*(boundary.w-100)+50, y = Math.random()*(boundary.h-160)+80;
+  let c = new Body("circle",x,y,w,w);
+  c.elastic=elasticity;c.fric=friction;
+  bodies.push(c);
+};
+document.getElementById('addRect').onclick = ()=>{
+  let w = Math.random()*36+30, h=Math.random()*32+24;
+  let x = Math.random()*(boundary.w-110)+60, y = Math.random()*(boundary.h-170)+90;
+  let r = new Body("rect",x,y,w,h,Math.random()*Math.PI*2);
+  r.elastic=elasticity;r.fric=friction;
+  bodies.push(r);
+};
+let springMode = false, removeSpringMode=false;
+document.getElementById('addSpring').onclick = ()=>{springMode=true; removeSpringMode=false;}
+document.getElementById('removeSpring').onclick = ()=>{removeSpringMode=true; springMode=false;}
+document.getElementById('debugBtn').onclick = ()=>{
+  debugDraw = !debugDraw;
+  document.getElementById('debugBtn').textContent = "Debug: "+(debugDraw?"On":"Off");
+};
+document.getElementById('saveSceneBtn').onclick = saveScene;
+document.getElementById('loadSceneBtn').onclick = loadScene;
+// =============== Mouse and Drag ===============
+let selectedBody = null, offsetX=0, offsetY=0;
+let mouse = {x:0, y:0, down:false};
+canvas.onmousedown = function(e){
+  mouse.down = true;
+  let rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX-rect.left;
+  mouse.y = e.clientY-rect.top;
+  if(springMode||removeSpringMode) return;
+  for(let b of bodies.slice().reverse()){
+    if(b.type==="circle"){
+      if(dist(mouse.x,mouse.y,b.x,b.y)<=b.radius){
+        selectedBody = b;
+        offsetX=mouse.x-b.x;
+        offsetY=mouse.y-b.y;
+        b.dragged=true;
+        b.angVel=0; break;
+      }
+    }else{
+      // Rectangle point-in-rotated-rect
+      let verts = b.getVertices();
+      let cnt=0;
+      for(let i=0;i<4;i++) {
+        let va = verts[i], vb = verts[(i+1)%4];
+        let dx=vb.x-va.x,dy=vb.y-va.y;
+        let px=mouse.x-va.x, py=mouse.y-va.y;
+        let cross = dx*py-dy*px;
+        if (cross<0) cnt++;
+      }
+      if(cnt===4){
+        selectedBody = b;
+        offsetX=mouse.x-b.x; offsetY=mouse.y-b.y;
+        b.dragged=true; b.angVel=0; break;
+      }
+    }
+  }
+};
+canvas.onmouseup = function(e){
+  mouse.down = false;
+  if(selectedBody) {
+    selectedBody.dragged=false;
+    // transfer velocity
+    selectedBody.vx=(mouse.x-selectedBody.x)*0.18;
+    selectedBody.vy=(mouse.y-selectedBody.y)*0.18;
+    selectedBody = null;
+  }
+  if(springMode||removeSpringMode){
+    springMode=false; removeSpringMode=false;
+    document.getElementById('addSpring').disabled=false;
+    document.getElementById('removeSpring').disabled=false;
+  }
+};
+canvas.onmousemove = function(e){
+  let rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX-rect.left;
+  mouse.y = e.clientY-rect.top;
+  if(selectedBody && selectedBody.dragged) {
+    selectedBody.x = clamp(mouse.x-offsetX,selectedBody.radius??selectedBody.w/2,boundary.w-(selectedBody.radius??selectedBody.w/2));
+    selectedBody.y = clamp(mouse.y-offsetY,selectedBody.radius??selectedBody.h/2,boundary.h-(selectedBody.radius??selectedBody.h/2));
+  }
+};
+canvas.onclick = function(e){
+  let rect = canvas.getBoundingClientRect();
+  let mx = e.clientX-rect.left, my = e.clientY-rect.top;
+  if(springMode){
+    let selA=null, selB=null;
+    for(let b of bodies){
+      if(b.type==="circle" && dist(mx,my,b.x,b.y)<=b.radius){ if(!selA)selA=b;else{selB=b;break;} }
+      if(b.type==="rect"){
+        let verts = b.getVertices();
+        let cnt=0;
+        for(let i=0;i<4;i++) {
+          let va = verts[i], vb = verts[(i+1)%4];
+          let dx=vb.x-va.x,dy=vb.y-va.y;
+          let px=mx-va.x, py=my-va.y;
+          let cross = dx*py-dy*px;
+          if (cross<0) cnt++;
+        }
+        if(cnt===4){if(!selA)selA=b;else{selB=b;break;}}
+      }
+    }
+    if(selA&&selB&&selA!==selB){
+      let sp = new Spring(selA,selB,dist(selA.x,selA.y,selB.x,selB.y));
+      springs.push(sp);
+      springMode=false;
+    }
+  }else if(removeSpringMode){
+    for(let i=0;i<springs.length;++i){
+      let s = springs[i];
+      let ax=s.a.x, ay=s.a.y, bx=s.b.x, by=s.b.y;
+      let d = Math.abs((mx-ax)*(by-ay)-(my-ay)*(bx-ax))/dist(ax,ay,bx,by);
+      if(d<12){
+        springs.splice(i,1);
+        removeSpringMode=false;
+        break;
+      }
+    }
+  }
+};
+// =============== Physics Engine ===============
+// --- collision circle vs circle ---
+function resolveCircleCircle(a, b){
+  let dx = b.x-a.x, dy = b.y-a.y, distAB = Math.sqrt(dx*dx+dy*dy);
+  let rsum = a.radius+b.radius;
+  if(distAB<rsum){
+    // resolve overlap
+    let overlap = rsum-distAB;
+    let nx=dx/distAB, ny=dy/distAB;
+    let tmass = a.mass+b.mass;
+    a.x -= nx*overlap*b.mass/tmass;
+    a.y -= ny*overlap*b.mass/tmass;
+    b.x += nx*overlap*a.mass/tmass;
+    b.y += ny*overlap*a.mass/tmass;
+    // velocities along normal, 1D elastic collision
+    let vaN = a.vx*nx+a.vy*ny, vbN = b.vx*nx+b.vy*ny;
+    let vaT = -a.vx*ny+a.vy*nx, vbT = -b.vx*ny+b.vy*nx;
+    let ea=a.elastic, eb=b.elastic;
+    let vNa = (vaN*(a.mass-b.mass) + 2*b.mass*vbN)/(a.mass+b.mass);
+    let vNb = (vbN*(b.mass-a.mass) + 2*a.mass*vaN)/(a.mass+b.mass);
+    a.vx = vNa*nx+vaT*-ny; a.vy = vNa*ny+vaT*nx;
+    b.vx = vNb*nx+vbT*-ny; b.vy = vNb*ny+vbT*nx;
+    a.vx *= ea; b.vx *= eb;
+    a.vy *= ea; b.vy *= eb;
+  }
+}
+// --- collision rect vs rect (SAT, rough)---
+function resolveRectRect(A,B) {
+  // Separating Axis Theorem, only vertices
+  let vertsA = A.getVertices(), vertsB = B.getVertices();
+  let axes = [];
+  for(let i=0;i<4;++i){
+    let va = vertsA[i], va2=vertsA[(i+1)%4];
+    axes.push({x:va2.x-va.x, y:va2.y-va.y});
+    let vb = vertsB[i], vb2=vertsB[(i+1)%4];
+    axes.push({x:vb2.x-vb.x, y:vb2.y-vb.y});
+  }
+  let overlap=Infinity, fixAxis=null;
+  for(let ax of axes){
+    let len = Math.sqrt(ax.x*ax.x+ax.y*ax.y);
+    let nx = ax.x/len, ny=ax.y/len;
+    let minA=Infinity,maxA=-Infinity,minB=Infinity,maxB=-Infinity;
+    for(let v of vertsA){
+      let p = v.x*nx + v.y*ny;
+      minA=Math.min(p,minA);maxA=Math.max(p,maxA);
+    }
+    for(let v of vertsB){
+      let p = v.x*nx + v.y*ny;
+      minB=Math.min(p,minB);maxB=Math.max(p,maxB);
+    }
+    let o = Math.min(maxA,maxB)-Math.max(minA,minB);
+    if(o<0){return;} // no collision
+    if(o<overlap){overlap=o;fixAxis={x:nx,y:ny};}
+  }
+  // resolve overlap
+  let tmass=A.mass+B.mass;
+  A.x -= fixAxis.x*overlap*B.mass/tmass;
+  A.y -= fixAxis.y*overlap*B.mass/tmass;
+  B.x += fixAxis.x*overlap*A.mass/tmass;
+  B.y += fixAxis.y*overlap*A.mass/tmass;
+  // Velocity along normal
+  let vaN=A.vx*fixAxis.x+A.vy*fixAxis.y;
+  let vbN=B.vx*fixAxis.x+B.vy*fixAxis.y;
+  let ea=A.elastic,eb=B.elastic;
+  let vNa = (vaN*(A.mass-B.mass)+2*B.mass*vbN)/(A.mass+B.mass);
+  let vNb = (vbN*(B.mass-A.mass)+2*A.mass*vaN)/(A.mass+B.mass);
+  A.vx = vNa*fixAxis.x+A.vy*fixAxis.y; A.vy = vNa*fixAxis.y+A.vy*fixAxis.x;
+  B.vx = vNb*fixAxis.x+B.vy*fixAxis.y; B.vy = vNb*fixAxis.y+B.vy*fixAxis.x;
+  A.vx *= ea; B.vx *= eb; A.vy *= ea; B.vy *= eb;
+}
+// --- collision circle vs rect ---
+function resolveCircleRect(c, r){
+  let verts=r.getVertices();
+  let closest=null, distMin=Infinity;
+  for(let i=0;i<verts.length;++i){
+    let d = dist(verts[i].x,verts[i].y,c.x,c.y);
+    if(d<distMin){distMin=d; closest=verts[i];}
+  }
+  // project circle center onto closest rectangle edge
+  let lines = [];
+  for(let i=0;i<4;++i) lines.push([verts[i],verts[(i+1)%4]]);
+  for(let ln of lines){
+    let ax=ln[0].x, ay=ln[0].y, bx=ln[1].x, by=ln[1].y;
+    let dx=bx-ax, dy=by-ay;
+    let t = clamp(((c.x-ax)*dx+(c.y-ay)*dy)/(dx*dx+dy*dy),0,1);
+    let px=ax+dx*t, py=ay+dy*t;
+    let d = dist(c.x,c.y,px,py);
+    if(d<c.radius){
+      // Move circle out
+      let nx = (c.x-px)/d, ny=(c.y-py)/d;
+      c.x = px + nx*c.radius;
+      c.y = py + ny*c.radius;
+      // Velocity bounce
+      let vn = c.vx*nx + c.vy*ny;
+      c.vx -= 2*vn*nx;
+      c.vy -= 2*vn*ny;
+      c.vx *= c.elastic;
+      c.vy *= c.elastic;
+      // If rectangle is not locked
+      if(!r.lockRotation){
+        r.vx -= c.vx*r.mass/(c.mass+r.mass);
+        r.vy -= c.vy*r.mass/(c.mass+r.mass);
+        r.angVel += ((px-r.x)*ny-(py-r.y)*nx)*0.033;
+      }
+    }
+  }
+}
+// --- walls (axis-aligned) ---
+function resolveWall(b){
+  if(b.type==="circle"){
+    if(b.x-b.radius<0){
+      b.x=b.radius; b.vx*=-b.elastic;
+    }else if(b.x+b.radius>boundary.w){
+      b.x=boundary.w-b.radius; b.vx*=-b.elastic;
+    }
+    if(b.y-b.radius<0){
+      b.y=b.radius; b.vy*=-b.elastic;
+    }else if(b.y+b.radius>boundary.h){
+      b.y = boundary.h-b.radius; b.vy*=-b.elastic;
+    }
+  }else{
+    let verts = b.getVertices();
+    let offx=0,offy=0;
+    for(let v of verts){
+      if(v.x<0) offx=Math.max(offx,-v.x);
+      if(v.x>boundary.w) offx=Math.min(offx,boundary.w-v.x);
+      if(v.y<0) offy=Math.max(offy,-v.y);
+      if(v.y>boundary.h) offy=Math.min(offy,boundary.h-v.y);
+    }
+    if(Math.abs(offx)>0||Math.abs(offy)>0){
+      b.x+=offx; b.y+=offy;
+      b.vx*=-b.elastic;
+      b.vy*=-b.elastic;
+    }
+  }
+}
+// --- update physics ---
+function updatePhysics(dt){
+  // Apply gravity, update motion
+  for(let b of bodies){
+    if(!b.dragged){
+      b.vx+=gravity.x;
+      b.vy+=gravity.y;
+      b.x+=b.vx*dt;
+      b.y+=b.vy*dt;
+      b.angle+=b.angVel*dt;
+      b.vx*=b.fric;
+      b.vy*=b.fric;
+      b.angVel*=0.99;
+      // Trails
+      b.trail.push({x:b.x,y:b.y});
+      if(b.trail.length>12) b.trail.shift();
+    }
+    resolveWall(b);
+  }
+  // Springs
+  for(let s of springs){
+    let dx = s.b.x-s.a.x, dy=s.b.y-s.a.y;
+    let d = Math.sqrt(dx*dx+dy*dy);
+    let f = (d-s.len)*s.k;
+    let fx = (dx/d)*f, fy=(dy/d)*f;
+    s.a.vx += fx*s.a.invMass;
+    s.a.vy += fy*s.a.invMass;
+    s.b.vx -= fx*s.b.invMass;
+    s.b.vy -= fy*s.b.invMass;
+    // Angular (for rects)
+    if(s.a.type==='rect') s.a.angVel -= fx*0.001;
+    if(s.b.type==='rect') s.b.angVel += fx*0.001;
+  }
+  // Collisions
+  for(let i=0;i<bodies.length;++i){
+    let a = bodies[i];
+    for(let j=i+1;j<bodies.length;++j){
+      let b = bodies[j];
+      if(a.type==='circle'&&b.type==='circle') resolveCircleCircle(a,b);
+      else if(a.type==='rect'&&b.type==='rect') resolveRectRect(a,b);
+      else if(a.type==='circle'&&b.type==='rect') resolveCircleRect(a,b);
+      else if(a.type==='rect'&&b.type==='circle') resolveCircleRect(b,a);
+    }
+  }
+}
+// =============== Drawing ===============
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(debugDraw) drawGrid();
+  // Draw springs
+  for(let s of springs){
+    ctx.beginPath();
+    ctx.moveTo(s.a.x,s.a.y);
+    ctx.lineTo(s.b.x,s.b.y);
+    ctx.strokeStyle = "#66ffcc";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    if(debugDraw) {
+      ctx.save();
+      ctx.globalAlpha=0.4;
+      ctx.beginPath();
+      ctx.arc((s.a.x+s.b.x)/2,(s.a.y+s.b.y)/2,Math.abs(s.len-dist(s.a.x,s.a.y,s.b.x,s.b.y)),0,2*Math.PI);
+      ctx.strokeStyle="#c2f";
+      ctx.lineWidth=2;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  // Draw bodies
+  for(let b of bodies){
+    if(b.type==="circle"){
+      ctx.save();
+      ctx.lineWidth=b.selected?5:2;
+      ctx.strokeStyle="#fff";
+      ctx.beginPath();
+      ctx.arc(b.x,b.y,b.radius,0,2*Math.PI);
+      ctx.fillStyle = b.color;
+      ctx.fill();
+      ctx.stroke();
+      if(debugDraw){
+        ctx.save();
+        ctx.globalAlpha=0.25;
+        ctx.strokeStyle="#fff";
+        ctx.setLineDash([3,4]);
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x+b.vx*2, b.y+b.vy*2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+      // Trails
+      if(debugDraw){
+        ctx.save();
+        ctx.globalAlpha=0.3;
+        for(let i=1;i<b.trail.length;++i){
+          ctx.beginPath();
+          ctx.moveTo(b.trail[i-1].x,b.trail[i-1].y);
+          ctx.lineTo(b.trail[i].x,b.trail[i].y);
+          ctx.strokeStyle=b.color;
+          ctx.lineWidth=4;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+    }else{
+      ctx.save();
+      ctx.lineWidth= b.selected?5:2;
+      ctx.strokeStyle="#fff";
+      ctx.fillStyle=b.color;
+      ctx.beginPath();
+      let verts = b.getVertices();
+      ctx.moveTo(verts[0].x, verts[0].y);
+      for(let v of verts)ctx.lineTo(v.x,v.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      if(debugDraw){
+        // Velocity vector
+        ctx.save();
+        ctx.globalAlpha=0.25;
+        ctx.setLineDash([3,4]);
+        ctx.strokeStyle="#fff";
+        ctx.beginPath();
+        ctx.moveTo(b.x,b.y);
+        ctx.lineTo(b.x+b.vx*2, b.y+b.vy*2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        // Rotation axis
+        ctx.save();
+        ctx.globalAlpha=0.6;
+        ctx.strokeStyle="#ff5";
+        ctx.lineWidth=3;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x+Math.cos(b.angle)*18, b.y+Math.sin(b.angle)*18);
+        ctx.stroke();
+        ctx.restore();
+        // Trails
+        ctx.save();
+        ctx.globalAlpha=0.3;
+        for(let i=1;i<b.trail.length;++i){
+          ctx.beginPath();
+          ctx.moveTo(b.trail[i-1].x,b.trail[i-1].y);
+          ctx.lineTo(b.trail[i].x,b.trail[i].y);
+          ctx.strokeStyle=b.color;
+          ctx.lineWidth=4;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+  }
+  // Indicator for modes
+  if(springMode){
+    ctx.save();
+    ctx.font="21px monospace";
+    ctx.fillStyle="#ff0";
+    ctx.fillText("Spring mode: Click 2 bodies",canvas.width-260,35);
+    ctx.restore();
+  }
+  if(removeSpringMode){
+    ctx.save();
+    ctx.font="21px monospace";
+    ctx.fillStyle="#f66";
+    ctx.fillText("Remove spring: Click line",canvas.width-320,35);
+    ctx.restore();
+  }
+  // Draw boundaries
+  ctx.save();
+  ctx.strokeStyle="#7f9";
+  ctx.lineWidth=7;
+  ctx.beginPath();
+  ctx.rect(0,0,canvas.width,canvas.height);
+  ctx.stroke();
+  ctx.restore();
+  // Draw FPS
+  ctx.save();
+  ctx.font="14px monospace";
+  ctx.fillStyle="#fff";
+  ctx.fillText("FPS: "+fps.toFixed(1),7,22);
+  ctx.restore();
+}
+// =============== Debug/Visual ===============
+function drawGrid(){
+  ctx.save();
+  ctx.globalAlpha=0.22;
+  ctx.strokeStyle="#fff";
+  ctx.lineWidth=1;
+  for(let x=0;x<canvas.width;x+=45){
+    ctx.beginPath();
+    ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);
+    ctx.stroke();
+  }
+  for(let y=0;y<canvas.height;y+=45){
+    ctx.beginPath();
+    ctx.moveTo(0,y); ctx.lineTo(canvas.width,y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+// =============== Main Loop ===============
+let fps=60, frametimes=[];
+function loop(ts){
+  if(lastTimestamp==null) lastTimestamp=ts;
+  let dt = Math.max(0.014,Math.min(0.05,(ts-lastTimestamp)/1000.0));
+  lastTimestamp=ts;
+  if(!paused) updatePhysics(dt);
+  draw();
+  // FPS
+  frametimes.push(dt); if(frametimes.length>30) frametimes.shift();
+  fps = 1.0/(frametimes.reduce((a,b)=>a+b,0)/frametimes.length);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// =============== Initial Scene ===============
+for(let i=0;i<4;++i)
+  bodies.push(new Body("circle",110+140*i,130+80,36+Math.random()*20,36+Math.random()*20));
+for(let i=0;i<2;++i)
+  bodies.push(new Body("rect",400+200*i,330,60+Math.random()*12,38+Math.random()*18,Math.random()*Math.PI));
+// Demo springs
+springs.push(new Spring(bodies[0],bodies[2],dist(bodies[0].x,bodies[0].y,bodies[2].x,bodies[2].y)));
+springs.push(new Spring(bodies[3],bodies[1],dist(bodies[1].x,bodies[1].y,bodies[3].x,bodies[3].y)));
+// =============== Visual Feedback ===============
+setInterval(()=>{
+  let str = "";
+  if(mouse.down) str+=`Mouse: (${mouse.x.toFixed(1)},${mouse.y.toFixed(1)})`;
+  if(selectedBody) str+=" | Dragging";
+  document.getElementById('mouseLab').innerText = str;
+  document.getElementById('fpsLabel').innerText = `FPS: ${fps.toFixed(1)}`;
+  bodies.forEach(b=>b.selected=false);
+  if(selectedBody) selectedBody.selected=true;
+},90);
+</script>
+</body>
+</html>
