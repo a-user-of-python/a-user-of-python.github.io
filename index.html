@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Brailet - Official Website</title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Set the Inter font globally */
@@ -14,45 +13,170 @@
             background-color: #f7f7f7;
             color: #333;
         }
+        /* Custom class for the distinct Braille dot style */
+        .braille-dot {
+            height: 10px;
+            width: 10px;
+            background-color: #333;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 1px;
+        }
     </style>
 </head>
 <body class="antialiased">
 
-    <!-- Hero Section: Displays the business name prominently -->
     <header class="bg-indigo-700 text-white py-20 px-4 shadow-xl">
         <div class="max-w-4xl mx-auto text-center">
-            <!-- Business Name -->
             <h1 class="text-7xl md:text-8xl font-extrabold tracking-tight leading-none">
                 BRAILLET
             </h1>
-            <!-- Tagline Placeholder -->
             <p class="mt-4 text-indigo-200 text-xl md:text-2xl font-light">
-               Building blocks for the future of the blind and visually impaired
+                Building blocks for the future of the blind and visually impaired
             </p>
         </div>
     </header>
 
-    <!-- Business Information Section (User Editable Content) -->
     <section id="business-info" class="py-16 px-4">
         <div class="max-w-4xl mx-auto">
             <div class="bg-white p-6 md:p-10 rounded-2xl shadow-2xl border-t-4 border-indigo-500">
                 <h2 class="text-3xl font-bold text-gray-800 mb-6">About Braillet</h2>
 
-                <!-- Placeholder Area for Business Info -->
                 <p class="text-lg text-gray-700 leading-relaxed mb-4">
-                   Braille is a business that makes small magnetic Braille blocks that you can add to a magnetic board. This is helpful because it can save many businesses lots of money. An example would be if a school wants a menu in braille.
+                    **Braillet** revolutionizes the creation of accessible signage and communication. We produce **small, durable, magnetic Braille blocks** that users can quickly arrange on a magnetic board to form any word or message.
+                </p>
+                <p class="text-lg text-gray-700 leading-relaxed">
+                    This innovative system offers a cost-effective and flexible alternative to expensive, static Braille plates. For businesses and institutions, such as a school needing a flexible menu, Braillet provides a practical, reusable solution, saving significant time and money while ensuring full accessibility.
                 </p>
 
                 <div class="mt-8 pt-4 border-t border-gray-100">
                     <p class="text-sm text-indigo-600 font-medium">
-
+                        Accessibility made simple, affordable, and dynamic.
                     </p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Instagram Link Section -->
+    <section id="how-it-works" class="py-20 px-4 bg-gray-100">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="text-4xl font-extrabold text-gray-800 mb-4">How Braillet Works</h2>
+            <p class="text-xl text-gray-600 mb-12">Create, change, and re-use Braille messages in seconds.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                
+                <div class="bg-white p-6 rounded-xl shadow-lg border-b-4 border-indigo-400 transform transition duration-300 hover:scale-[1.03]">
+                    <span class="text-4xl text-indigo-600 font-bold mb-3 block">1</span>
+                    <h3 class="text-xl font-semibold mb-3 text-gray-700">The Magnetic Blocks</h3>
+                    <p class="text-gray-600 text-base">
+                        Each block represents one or two Braille characters. They are small, tactile, and embedded with a strong magnet for easy placement.
+                    </p>
+                    <div class="mt-4">
+                        <span class="inline-flex items-center space-x-1">
+                            <span class="braille-dot bg-indigo-700"></span>
+                            <span class="braille-dot"></span>
+                            <span class="braille-dot bg-indigo-700"></span>
+                            <span class="braille-dot"></span>
+                            <span class="braille-dot bg-indigo-700"></span>
+                            <span class="braille-dot"></span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-lg border-b-4 border-indigo-400 transform transition duration-300 hover:scale-[1.03]">
+                    <span class="text-4xl text-indigo-600 font-bold mb-3 block">2</span>
+                    <h3 class="text-xl font-semibold mb-3 text-gray-700">The Magnetic Board</h3>
+                    <p class="text-gray-600 text-base">
+                        A clean, non-glare board provides the base. The magnetic surface ensures the blocks snap securely into place and won't shift.
+                    </p>
+                    <div class="mt-4 h-12 bg-gray-200 rounded-lg border-2 border-dashed border-indigo-300 flex items-center justify-center text-sm text-gray-500">
+                        Magnetic Surface Area
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-lg border-b-4 border-indigo-400 transform transition duration-300 hover:scale-[1.03]">
+                    <span class="text-4xl text-indigo-600 font-bold mb-3 block">3</span>
+                    <h3 class="text-xl font-semibold mb-3 text-gray-700">Dynamic Messaging</h3>
+                    <p class="text-gray-600 text-base">
+                        Arrange the blocks to spell out anything—from a room number to a daily special. Messages can be changed daily, weekly, or instantly.
+                    </p>
+                    <div class="mt-4 text-3xl font-mono text-gray-900">
+                        M E N U
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="benefits" class="py-20 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-4xl font-extrabold text-center text-gray-800 mb-12">Key Benefits for Your Business</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                <div class="flex items-start p-6 bg-white rounded-xl shadow-xl border-l-4 border-green-500">
+                    <svg class="w-8 h-8 text-green-500 mr-4 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8v8m-11-5h20a2 2 0 012 2v10a2 2 0 01-2 2H3a2 2 0 01-2-2v-10a2 2 0 012-2z"></path></svg>
+                    <div>
+                        <h4 class="text-xl font-semibold text-gray-800 mb-1">Cost-Effective Reusability</h4>
+                        <p class="text-gray-600">
+                            Eliminate the need to print costly, new permanent Braille signs every time information changes. Braillet pays for itself quickly.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-start p-6 bg-white rounded-xl shadow-xl border-l-4 border-yellow-500">
+                    <svg class="w-8 h-8 text-yellow-500 mr-4 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <div>
+                        <h4 class="text-xl font-semibold text-gray-800 mb-1">Instant Accessibility</h4>
+                        <p class="text-gray-600">
+                            Quickly update information (daily specials, room statuses, temporary notices) to maintain ADA compliance effortlessly.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-start p-6 bg-white rounded-xl shadow-xl border-l-4 border-red-500">
+                    <svg class="w-8 h-8 text-red-500 mr-4 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+                    <div>
+                        <h4 class="text-xl font-semibold text-gray-800 mb-1">User-Friendly Design</h4>
+                        <p class="text-gray-600">
+                            No special equipment or training needed. Anyone can compose and change messages in a matter of minutes.
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start p-6 bg-white rounded-xl shadow-xl border-l-4 border-indigo-500">
+                    <svg class="w-8 h-8 text-indigo-500 mr-4 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.09 5.56M12 3l-1.09 5.56m0 0l-5.56 1.09L3 12l5.56 1.09 1.09 5.56 1.09-5.56 5.56-1.09L21 12l-5.56-1.09-1.09-5.56z"></path></svg>
+                    <div>
+                        <h4 class="text-xl font-semibold text-gray-800 mb-1">Durable, Premium Build</h4>
+                        <p class="text-gray-600">
+                            The blocks and board are built from high-quality, long-lasting materials suitable for continuous public use.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <section id="product-access" class="py-16 px-4 bg-indigo-700">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="text-3xl font-bold text-white mb-8">Ready to Improve Your Accessibility?</h2>
+            
+            <div class="flex flex-col sm:flex-row flex-wrap justify-center gap-6">
+                
+                <a href="https://drive.google.com/file/d/1e21_ON5aJJ2th2_ptS9J20wIA_ymRQ8E/view?usp=drivesdk" target="_blank"
+                   class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-bold rounded-full text-white bg-pink-500 hover:bg-pink-600 transition duration-300 ease-in-out shadow-lg transform hover:scale-105 active:scale-100">
+                    
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M12 19V6m0 0l-3 3M12 6l3 3M4 19h16M4 15V5a2 2 0 012-2h10l-2 3M4 15V5M16 19v-4M8 19v-4"/></svg>
+                    Check out the soundtrack for my other project
+                </a>
+                
+            <p class="mt-8 text-indigo-200 text-sm">
+                *The soundtrack link will open a file shared directly from our secure Google Drive.
+            </p>
+        </div>
+    </section>
+
     <section id="social-link" class="py-16 px-4 bg-indigo-50">
         <div class="max-w-4xl mx-auto">
             <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl flex flex-col items-center text-center">
@@ -61,11 +185,9 @@
                     Get behind-the-scenes glimpses, announcements, and connect with the Braillet community.
                 </p>
 
-                <!-- Instagram Link Button (Editable) -->
                 <a id="instagramLink" href="https://www.instagram.com/braillet.co?igsh=MWh2MzQ0Z282dnBnZg%3D%3D&utm_source=qr" target="_blank"
                    class="inline-flex items-center justify-center w-full sm:w-auto px-8 py-4 border border-transparent text-lg font-bold rounded-full text-white bg-pink-600 hover:bg-pink-700 transition duration-300 ease-in-out shadow-lg hover:shadow-2xl transform hover:scale-105 active:scale-100 focus:outline-none focus:ring-4 focus:ring-pink-300">
 
-                    <!-- Simple Inline SVG Instagram Icon -->
                     <svg class="w-6 h-6 mr-3" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.068 1.645.068 4.854 0 3.204-.012 3.584-.068 4.85-.148 3.225-1.691 4.771-4.919 4.919-1.266.058-1.645.068-4.854.068-3.204 0-3.584-.012-4.85-.068-3.225-.148-4.773-1.691-4.92-4.919-.058-1.265-.068-1.645-.068-4.854 0-3.204.012-3.584.068-4.85.148-3.227 1.693-4.772 4.92-4.919 1.265-.058 1.644-.068 4.854-.068zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.21-6.78 2.632-6.99 6.988-.059 1.28-.073 1.688-.073 4.948 0 3.259.014 3.668.072 4.948.21 4.357 2.632 6.78 6.988 6.988 1.28.058 1.688.073 4.948.073 3.259 0 3.668-.014 4.948-.072 4.354-.21 6.78-2.633 6.987-6.988.058-1.28.073-1.688.073-4.948 0-3.259-.014-3.667-.072-4.947-.21-4.352-2.632-6.78-6.988-6.987-1.28-.059-1.688-.073-4.948-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.758 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4s1.791-4 4-4 4 1.79 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
                     </svg>
@@ -79,14 +201,12 @@
         </div>
     </section>
 
-    <!-- Footer -->
     <footer class="bg-gray-800 text-white py-6 mt-10">
         <div class="max-w-4xl mx-auto text-center text-sm">
             &copy; <span id="currentYear"></span> Brailet. All rights reserved.
         </div>
     </footer>
 
-    <!-- JavaScript to automatically set the current year in the footer -->
     <script>
         document.getElementById('currentYear').textContent = new Date().getFullYear();
     </script>
